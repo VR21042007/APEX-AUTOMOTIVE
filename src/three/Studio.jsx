@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ContactShadows, Environment, Lightformer } from '@react-three/drei'
 import { instantiateCar } from '../lib/carModel'
@@ -14,9 +14,9 @@ function makeFloorGlowTexture() {
   canvas.height = 512
   const context = canvas.getContext('2d')
   const gradient = context.createRadialGradient(256, 270, 20, 256, 270, 230)
-  gradient.addColorStop(0, 'rgba(0, 184, 122, 0.35)')
-  gradient.addColorStop(0.34, 'rgba(0, 90, 60, 0.55)')
-  gradient.addColorStop(0.7, 'rgba(5, 8, 6, 0.3)')
+  gradient.addColorStop(0, 'rgba(21, 108, 75, 0.14)')
+  gradient.addColorStop(0.34, 'rgba(7, 53, 38, 0.2)')
+  gradient.addColorStop(0.7, 'rgba(5, 8, 6, 0.16)')
   gradient.addColorStop(1, 'rgba(2, 4, 3, 0)')
   context.fillStyle = gradient
   context.fillRect(0, 0, 512, 512)
@@ -33,33 +33,61 @@ export function CarObject({ source, ...props }) {
 
 export function StudioLighting({ compact = false, progressSource }) {
   const sweepLightRef = useRef(null)
+  const keyLightRef = useRef(null)
+  const ambientRef = useRef(null)
+  const scene = useThree((state) => state.scene)
+  const fog = useMemo(() => new THREE.Fog(new THREE.Color('#101820'), 18, 66), [])
+  const brightBackground = useMemo(() => new THREE.Color('#81898a'), [])
+  const darkBackground = useMemo(() => new THREE.Color('#080d13'), [])
 
   useFrame(() => {
     const light = sweepLightRef.current
-    if (!light) return
     const progress = compact ? 0 : progressSource?.progress ?? cinematicState.progress
     const p = THREE.MathUtils.clamp(progress, 0, 1)
-    light.position.set(
-      THREE.MathUtils.lerp(2.2, -1.8, p),
-      4.6,
-      THREE.MathUtils.lerp(4.6, -1.2, p)
-    )
-    light.target.position.set(0, 0.42, 0)
-    light.target.updateWorldMatrix(true, false)
-    light.intensity = THREE.MathUtils.lerp(12, 30, p)
+    const dark = compact ? 1 : THREE.MathUtils.smoothstep(p, 0.46, 0.57)
+    const road = compact ? 0 : THREE.MathUtils.smoothstep(p, 0.84, 0.98)
+
+    if (light) {
+      light.position.set(
+        THREE.MathUtils.lerp(2.2, -1.8, p),
+        THREE.MathUtils.lerp(6.2, 4.2, dark),
+        THREE.MathUtils.lerp(4.6, -1.2, p),
+      )
+      light.target.position.set(0, 0.42, 0)
+      light.target.updateWorldMatrix(true, false)
+      light.intensity = THREE.MathUtils.lerp(22, 16, dark) + road * 4
+      light.color.set(road > 0.01 ? '#d9e4ed' : '#f2e8cf')
+    }
+
+    if (keyLightRef.current) {
+      keyLightRef.current.intensity = THREE.MathUtils.lerp(4.4, 1.8, dark) + road * 1.3
+      keyLightRef.current.position.set(4, THREE.MathUtils.lerp(8, 5, dark), 5)
+    }
+    if (ambientRef.current) {
+      ambientRef.current.intensity = THREE.MathUtils.lerp(1.2, 0.34, dark) + road * 0.48
+    }
+
+    scene.background = null
+    scene.fog = road > 0.18 ? fog : null
+    if (scene.fog) {
+      scene.fog.color.copy(darkBackground).lerp(brightBackground, road * 0.16)
+      scene.fog.near = THREE.MathUtils.lerp(20, 13, road)
+      scene.fog.far = THREE.MathUtils.lerp(72, 50, road)
+    }
   })
 
   return (
     <>
-      <ambientLight intensity={compact ? 0.16 : 0.16} color="#e9f1f6" />
-      <hemisphereLight args={['#dce3e8', '#0a1a15', compact ? 0.3 : 0.35]} />
+      <ambientLight ref={ambientRef} intensity={compact ? 0.34 : 1.2} color="#e9f1f6" />
+      <hemisphereLight args={['#e7edf0', '#12231d', compact ? 0.42 : 0.68]} />
       <directionalLight
+        ref={keyLightRef}
         color="#e9f1f6"
-        intensity={compact ? 2.8 : 3.2}
-        position={[4, 7, 5]}
+        intensity={compact ? 2.5 : 4.4}
+        position={[4, 8, 5]}
         castShadow
       />
-      <directionalLight color="#b9c8d6" intensity={compact ? 1 : 1.1} position={[-3, 4, -6]} />
+      <directionalLight color="#c8d8e2" intensity={compact ? 1.15 : 1.8} position={[-3, 4, -6]} />
       <spotLight
         ref={sweepLightRef}
         color="#f2e8cf"
@@ -92,20 +120,19 @@ export function StudioLighting({ compact = false, progressSource }) {
       <Environment
         resolution={compact ? 128 : 192}
         frames={1}
-        environmentIntensity={compact ? 0.4 : 0.5}
+        environmentIntensity={compact ? 0.48 : 0.78}
       >
-        <color attach="background" args={['#050807']} />
         <Lightformer
           form="rect"
-          intensity={compact ? 3.6 : 4}
+          intensity={compact ? 4.2 : 5.3}
           color="#f2e8cf"
-          scale={[9, 2.8, 1]}
+          scale={[11, 3.2, 1]}
           position={[0, 5, -3.5]}
           rotation={[0, 0, 0]}
         />
         <Lightformer
           form="rect"
-          intensity={compact ? 1.4 : 1.6}
+          intensity={compact ? 2.2 : 2.8}
           color="#e9f1f6"
           scale={[5, 1, 1]}
           position={[-2, 2.5, 5.5]}
@@ -113,7 +140,7 @@ export function StudioLighting({ compact = false, progressSource }) {
         />
         <Lightformer
           form="ring"
-          intensity={compact ? 1 : 1.2}
+          intensity={compact ? 1.4 : 1.8}
           color="#ffffff"
           scale={2.6}
           position={[2.5, 5.5, 2.5]}
@@ -126,21 +153,36 @@ export function StudioLighting({ compact = false, progressSource }) {
 
 export function StudioFloor({ compact = false, intensity = 1 }) {
   const glow = useMemo(() => makeFloorGlowTexture(), [])
+  const floorRef = useRef(null)
+  const glowRef = useRef(null)
+  const polished = useMemo(() => new THREE.Color('#92999a'), [])
+  const midnight = useMemo(() => new THREE.Color('#020403'), [])
+
+  useFrame(() => {
+    const p = compact ? 1 : THREE.MathUtils.clamp(cinematicState.progress, 0, 1)
+    const dark = compact ? 1 : THREE.MathUtils.smoothstep(p, 0.46, 0.57)
+    if (floorRef.current) {
+      floorRef.current.color.copy(polished).lerp(midnight, dark)
+    }
+    if (glowRef.current) glowRef.current.opacity = compact ? 0.35 : THREE.MathUtils.lerp(0.1, 0.35, dark)
+  })
 
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-        <planeGeometry args={[46, 46]} />
+        <planeGeometry args={[140, 140]} />
         <meshStandardMaterial
-          color="#020403"
-          roughness={0.18}
-          metalness={0.3}
-          envMapIntensity={0.4}
+          ref={floorRef}
+          color="#92999a"
+          roughness={0.24}
+          metalness={0.12}
+          envMapIntensity={0.72}
         />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.008, 0]}>
         <planeGeometry args={[14, 9]} />
         <meshBasicMaterial
+          ref={glowRef}
           map={glow}
           transparent
           depthWrite={false}

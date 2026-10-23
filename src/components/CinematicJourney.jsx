@@ -11,7 +11,18 @@ import { useReducedMotion } from '../hooks/useMediaQuery'
 
 gsap.registerPlugin(ScrollTrigger)
 
-const STAGE_THRESHOLDS = [0.11, 0.24, 0.39, 0.54, 0.69, 0.86]
+const STAGE_THRESHOLDS = [0.09, 0.2, 0.3, 0.4, 0.52, 0.64, 0.76, 0.88]
+
+function syncCinematicComposition(frame, progress) {
+  if (!frame) return
+  const p = Math.max(0, Math.min(1, progress))
+  const studioDark = Math.max(0, Math.min(1, (p - 0.46) / 0.11))
+  const easedDark = studioDark * studioDark * (3 - 2 * studioDark)
+  frame.style.setProperty('--story-progress', `${p * 100}%`)
+  frame.style.setProperty('--intro-away', String(Math.max(0, Math.min(1, p / 0.105))))
+  frame.style.setProperty('--bright-studio', `${(1 - easedDark) * 100}%`)
+  frame.style.setProperty('--studio-opacity', String(1 - easedDark))
+}
 
 function getStage(progress) {
   const nextStage = STAGE_THRESHOLDS.findIndex((threshold) => progress < threshold)
@@ -100,7 +111,7 @@ export function CinematicJourney({ model, ready }) {
   const [inView, setInView] = useState(true)
   const [webgl] = useState(() => supportsWebGL())
   const staticMode = reducedMotion || !webgl
-  const activeLabel = activeStage === 0 ? 'Introduction' : STORY_STAGES[activeStage - 1]?.label
+  const activeLabel = activeStage === 0 ? 'Front reveal' : STORY_STAGES[activeStage - 1]?.label
 
   useEffect(() => {
     const node = frameRef.current
@@ -122,30 +133,31 @@ export function CinematicJourney({ model, ready }) {
     if (staticMode) {
       cinematicState.progress = 0
       setActiveStage(0)
+      syncCinematicComposition(frameRef.current, 0)
       if (progressFillRef.current) progressFillRef.current.style.transform = 'scaleX(0)'
       return undefined
     }
 
     const context = gsap.context(() => {
-      gsap.to(cinematicState, {
-        progress: 1,
-        ease: 'none',
+      const timeline = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top top',
-          end: () => `+=${window.innerHeight * (window.innerWidth < 780 ? 3.8 : 4.9)}`,
+          end: () => `+=${window.innerHeight * (window.innerWidth < 780 ? 8 : 7.4)}`,
           pin: frameRef.current,
           pinSpacing: true,
-          scrub: 0.9,
+          scrub: 1,
           anticipatePin: 1,
           invalidateOnRefresh: true,
           onRefresh: (self) => {
             window.__apexStory = { start: self.start, end: self.end }
+            syncCinematicComposition(frameRef.current, self.progress)
             if (progressFillRef.current) {
               progressFillRef.current.style.transform = `scaleX(${self.progress})`
             }
           },
           onUpdate: (self) => {
+            syncCinematicComposition(frameRef.current, self.progress)
             const next = getStage(self.progress)
             setActiveStage((current) => (current === next ? current : next))
             if (progressFillRef.current) {
@@ -154,6 +166,7 @@ export function CinematicJourney({ model, ready }) {
           },
         },
       })
+      timeline.to(cinematicState, { progress: 1, ease: 'none' }, 0)
     }, sectionRef)
 
     return () => {
@@ -180,12 +193,13 @@ export function CinematicJourney({ model, ready }) {
       className={`cinematic-track${staticMode ? ' cinematic-track--static' : ''}${
         ready ? ' cinematic-track--ready' : ''
       }`}
-      aria-label="APEX Astra cinematic introduction"
+      aria-label="APEX Astra nine-shot cinematic introduction"
     >
       <div ref={frameRef} className="cinematic-frame" data-stage={activeStage}>
         <div className="cinematic-ambient" aria-hidden="true">
           <span className="cinematic-ambient__orb" />
           <span className="cinematic-ambient__grid" />
+          <span className="cinematic-ambient__architecture" />
         </div>
 
         {webgl && model && ready ? (
@@ -217,7 +231,7 @@ export function CinematicJourney({ model, ready }) {
           </h1>
 
           <div className="hero-side-note" aria-hidden="true">
-              <span>01 / 06</span>
+              <span>01 / 09</span>
             <span className="hero-side-note__line" />
             <span>A study in motion</span>
           </div>
@@ -281,7 +295,7 @@ export function CinematicJourney({ model, ready }) {
 
         <div className="journey-progress">
           <div className="journey-progress__meta">
-            <span>{String(activeStage).padStart(2, '0')} / 06</span>
+            <span>{String(activeStage + 1).padStart(2, '0')} / 09</span>
             <span className="journey-progress__label">{activeLabel}</span>
           </div>
           <span className="journey-progress__track" aria-hidden="true">

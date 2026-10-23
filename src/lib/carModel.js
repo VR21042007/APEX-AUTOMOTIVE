@@ -61,34 +61,34 @@ function styleMaterial(material) {
   const name = material.name || ''
 
   if (name.startsWith('Paint 1')) {
-    material.color?.set('#004225')
-    material.metalness = 0.82
-    material.roughness = 0.14
+    material.color?.set('#075939')
+    material.metalness = 0.72
+    material.roughness = 0.19
     material.normalScale?.set(0.06, 0.06)
     if ('clearcoat' in material) {
       material.clearcoat = 1
       material.clearcoatRoughness = 0.025
     }
-    material.envMapIntensity = 1.18
+    material.envMapIntensity = 1.38
     material.needsUpdate = true
   } else if (name.startsWith('Paint 2')) {
-    material.color?.set('#002d1f')
-    material.metalness = 0.8
-    material.roughness = 0.18
+    material.color?.set('#03452e')
+    material.metalness = 0.7
+    material.roughness = 0.22
     material.normalScale?.set(0.05, 0.05)
     if ('clearcoat' in material) {
       material.clearcoat = 1
       material.clearcoatRoughness = 0.04
     }
-    material.envMapIntensity = 1.05
+    material.envMapIntensity = 1.28
     material.needsUpdate = true
   } else if (name.startsWith('Glass')) {
-    material.color?.set('#9aa6aa')
+    material.color?.set('#c8d1d2')
     material.metalness = 0
-    material.roughness = 0.03
-    material.envMapIntensity = 1.4
-    if ('transmission' in material) material.transmission = 0.92
-    if ('thickness' in material) material.thickness = 0.2
+    material.roughness = 0.065
+    material.envMapIntensity = 0.65
+    if ('transmission' in material) material.transmission = 0.98
+    if ('thickness' in material) material.thickness = 0.12
     if ('ior' in material) material.ior = 1.48
   } else if (name === 'Rim1' || name === 'Rim2') {
     material.color?.set('#b7b9bb')
@@ -116,8 +116,14 @@ function styleMaterial(material) {
     material.color?.set('#080808')
     material.roughness = 0.82
     material.metalness = 0.05
+  } else if (name === 'Interior 1' || name === 'Interior 2') {
+    material.color?.set('#3a413e')
+    material.roughness = 0.68
+  } else if (name === 'Dashboard') {
+    material.color?.set('#303735')
+    material.roughness = 0.62
   } else if (name === 'Interior 3 Carmine') {
-    material.color?.set('#55200f')
+    material.color?.set('#70472f')
     material.roughness = 0.66
   } else if (name === 'License') {
     material.map?.dispose?.()

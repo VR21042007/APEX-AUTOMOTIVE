@@ -91,7 +91,7 @@ export function Footer() {
             target="_blank"
             rel="noreferrer"
           >
-            Car Concept by Eric Chadwick / Darmstadt Graphics Group, CC BY 4.0
+            McLaren P1 model by vecarz, CC BY 4.0
           </a>
           . Adapted for this concept.
         </p>

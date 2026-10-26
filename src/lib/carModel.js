@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 
-export const CAR_MODEL_URL = '/models/car-concept.glb'
+export const CAR_MODEL_URL = '/models/mclaren-p1.glb'
 export const CAR_CREDIT =
-  'Car Concept by Eric Chadwick / Darmstadt Graphics Group (CC BY 4.0), based on Concept Car 004 by Unity Fan (CC0).'
+  '“Mclaren P1 | www.vecarz.com” by vecarz (CC BY 4.0), via Sketchfab.'
 
-const CAR_WHEELS = ['WheelFrontL', 'WheelFrontR', 'WheelRearL', 'WheelRearR']
+export const CAR_WHEELS = ['WHEEL_LF', 'WHEEL_RF', 'WHEEL_LR', 'WHEEL_RR']
 
 let cachedPromise = null
 const progressListeners = new Set()
@@ -14,126 +15,51 @@ function emitProgress(value) {
   for (const listener of progressListeners) listener(value)
 }
 
-function makePlateTexture() {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1024
-  canvas.height = 1024
-  const ctx = canvas.getContext('2d')
-  const gradient = ctx.createLinearGradient(0, 0, 0, 1024)
-  gradient.addColorStop(0, '#141517')
-  gradient.addColorStop(1, '#050505')
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, 1024, 1024)
-  ctx.strokeStyle = 'rgba(244, 241, 235, 0.45)'
-  ctx.lineWidth = 8
-  ctx.strokeRect(32, 32, 960, 960)
-  ctx.fillStyle = '#F2E8CF'
-  ctx.fillRect(32, 32, 960, 90)
-  ctx.fillStyle = '#F2E8CF'
-  ctx.font = '700 300px Anton, Arial, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('APEX', 512, 430)
-  ctx.fillStyle = '#F3EFE7'
-  ctx.font = '600 74px Manrope, Arial, sans-serif'
-  ctx.letterSpacing = '18px'
-  ctx.fillText('ASTRA / 001', 512, 670)
-  ctx.fillStyle = '#F2E8CF'
-  ctx.font = '500 48px Manrope, Arial, sans-serif'
-  ctx.fillText('PERFORMANCE DIVISION', 512, 790)
-  ctx.strokeStyle = 'rgba(244, 241, 235, 0.18)'
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(190, 870)
-  ctx.lineTo(834, 870)
-  ctx.stroke()
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  texture.anisotropy = 8
-  return texture
-}
-
 const processedMaterials = new WeakSet()
+
+export const PAPAYA = '#ff7a00'
 
 function styleMaterial(material) {
   if (!material || processedMaterials.has(material)) return material
   processedMaterials.add(material)
   const name = material.name || ''
 
-  if (name.startsWith('Paint 1')) {
-    material.color?.set('#075939')
-    material.metalness = 0.72
-    material.roughness = 0.19
-    material.normalScale?.set(0.06, 0.06)
+  if (name === 'Carpaint') {
+    material.color?.set(PAPAYA)
+    material.metalness = 0.55
+    material.roughness = 0.3
     if ('clearcoat' in material) {
       material.clearcoat = 1
-      material.clearcoatRoughness = 0.025
+      material.clearcoatRoughness = 0.03
     }
-    material.envMapIntensity = 1.38
-    material.needsUpdate = true
-  } else if (name.startsWith('Paint 2')) {
-    material.color?.set('#03452e')
-    material.metalness = 0.7
-    material.roughness = 0.22
-    material.normalScale?.set(0.05, 0.05)
-    if ('clearcoat' in material) {
-      material.clearcoat = 1
-      material.clearcoatRoughness = 0.04
-    }
-    material.envMapIntensity = 1.28
-    material.needsUpdate = true
-  } else if (name.startsWith('Glass')) {
-    material.color?.set('#c8d1d2')
-    material.metalness = 0
-    material.roughness = 0.065
-    material.envMapIntensity = 0.65
-    if ('transmission' in material) material.transmission = 0.98
-    if ('thickness' in material) material.thickness = 0.12
-    if ('ior' in material) material.ior = 1.48
-  } else if (name === 'Rim1' || name === 'Rim2') {
-    material.color?.set('#b7b9bb')
+    material.envMapIntensity = 1.35
+  } else if (name === 'Carpaint_Black') {
+    material.envMapIntensity = 1.1
+  } else if (name === 'Windows' || name === 'Windows_alpha' || name === 'Clear_Glass') {
+    material.envMapIntensity = 0.8
+  } else if (name === 'Chrome') {
+    // The source file marks chrome as a 10x white emitter, which reads as a flat white blob.
+    material.emissive?.set('#000000')
+    material.emissiveIntensity = 0
     material.metalness = 1
-    material.roughness = 0.24
-    material.envMapIntensity = 1.5
-  } else if (name === 'Brake') {
-    material.color?.set('#00331c')
-    material.metalness = 0.6
-    material.roughness = 0.35
-  } else if (name === 'Disc') {
-    material.color?.set('#a4a5a5')
-    material.metalness = 1
-    material.roughness = 0.38
-  } else if (name === 'Headlight') {
-    material.emissive?.set('#e6f2ff')
-    material.emissiveIntensity = 2.4
     material.roughness = 0.12
-  } else if (name === 'Brakelight' || name === 'Signallight') {
-    material.color?.set('#e51f00')
-    material.emissive?.set('#ff2600')
-    material.emissiveIntensity = name === 'Brakelight' ? 3.6 : 2.2
-    material.roughness = 0.22
-  } else if (name === 'Tireside' || name === 'Tiretread') {
-    material.color?.set('#080808')
-    material.roughness = 0.82
-    material.metalness = 0.05
-  } else if (name === 'Interior 1' || name === 'Interior 2') {
-    material.color?.set('#3a413e')
-    material.roughness = 0.68
-  } else if (name === 'Dashboard') {
-    material.color?.set('#303735')
-    material.roughness = 0.62
-  } else if (name === 'Interior 3 Carmine') {
-    material.color?.set('#70472f')
-    material.roughness = 0.66
-  } else if (name === 'License') {
-    material.map?.dispose?.()
-    material.map = makePlateTexture()
-    material.color?.set('#ffffff')
-    material.metalness = 0.25
-    material.roughness = 0.38
-    material.needsUpdate = true
+  } else if (name === 'Headlights') {
+    material.emissive?.set('#e6f2ff')
+    material.emissiveMap = material.map
+    material.emissiveIntensity = 0.9
+  } else if (name === 'Taillights') {
+    material.emissiveIntensity = 0.35
+  } else if (name === 'Brake_Disk') {
+    material.color?.set('#3a3c3e')
+    material.metalness = 1
+    material.roughness = 0.34
+  } else if (name === 'INT_DISPLAY') {
+    material.emissive?.set('#ffffff')
+    material.emissiveMap = material.map
+    material.emissiveIntensity = 0
   }
 
+  material.needsUpdate = true
   if (material.map) {
     material.map.anisotropy = 8
     material.map.needsUpdate = true
@@ -142,12 +68,20 @@ function styleMaterial(material) {
   return material
 }
 
-function prepareCarScene(gltf) {
-  const scene = gltf.scene
-  scene.updateMatrixWorld(true)
+// Real McLaren P1 length. The source file is modelled at roughly 1:2.3 scale.
+const TARGET_LENGTH = 4.59
 
-  const emblem = scene.getObjectByName('InteriorSteeringEmblem')
-  if (emblem) emblem.visible = false
+function prepareCarScene(gltf) {
+  const model = gltf.scene
+  model.updateMatrixWorld(true)
+  const rawBox = new THREE.Box3().setFromObject(model, true)
+  const rawSize = rawBox.getSize(new THREE.Vector3())
+  model.scale.multiplyScalar(TARGET_LENGTH / rawSize.z)
+
+  const scene = new THREE.Group()
+  scene.name = 'ApexCar'
+  scene.add(model)
+  scene.updateMatrixWorld(true)
 
   scene.traverse((child) => {
     if (!child.isMesh) return
@@ -157,7 +91,7 @@ function prepareCarScene(gltf) {
     materials.forEach(styleMaterial)
   })
 
-  const box = new THREE.Box3().setFromObject(scene)
+  const box = new THREE.Box3().setFromObject(scene, true)
   const center = new THREE.Vector3()
   box.getCenter(center)
 
@@ -165,14 +99,14 @@ function prepareCarScene(gltf) {
   for (const name of CAR_WHEELS) {
     const wheel = scene.getObjectByName(name)
     if (!wheel) continue
-    const wheelBox = new THREE.Box3().setFromObject(wheel)
+    const wheelBox = new THREE.Box3().setFromObject(wheel, true)
     wheelBottom = Math.min(wheelBottom, wheelBox.min.y)
   }
   if (!Number.isFinite(wheelBottom)) wheelBottom = box.min.y
 
   scene.userData.placement = {
     x: -center.x,
-    y: -wheelBottom + 0.015,
+    y: -wheelBottom + 0.005,
     z: -center.z,
     length: box.max.z - box.min.z,
     width: box.max.x - box.min.x,
@@ -203,6 +137,7 @@ export function loadCarModel() {
       }
       emitProgress(100)
       const loader = new GLTFLoader()
+      loader.setMeshoptDecoder(MeshoptDecoder)
       loader.parse(
         request.response,
         `${CAR_MODEL_URL.substring(0, CAR_MODEL_URL.lastIndexOf('/') + 1)}`,

@@ -1,356 +1,268 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { PerformanceMonitor } from '@react-three/drei'
 import * as THREE from 'three'
 import { cinematicState } from '../lib/cinematicState'
-import { instantiateCar } from '../lib/carModel'
-import { StudioFloor, StudioLighting } from './Studio'
+import { TIMELINE } from '../lib/cinematicTimeline'
+import { CinematicCar, SceneLabelLayer } from './cinematic/CinematicCar'
+import { applyShell } from './cinematic/carRig'
+import { CinematicWorld } from './cinematic/Environments'
+import { updateDrive } from './cinematic/driveState'
 
-// Each held pair is a shot. The transitions orbit the same car and keep the
-// camera outside the body while the focus point moves between real GLB meshes.
-const DESKTOP_STOPS = [
-  { at: 0, angle: 0.72, radius: 7.8, height: 1.35, target: [0, 0.62, 0], fov: 34 },
-  { at: 0.09, angle: 0.25, radius: 6.3, height: 1.05, target: [0, 0.62, 0], fov: 32 },
-  { at: 0.1, angle: 0.08, radius: 2.8, height: 0.72, focus: 'BodyHood', fov: 29 },
-  { at: 0.19, angle: 0.08, radius: 2.8, height: 0.72, focus: 'BodyHood', fov: 29 },
-  { at: 0.2, angle: 0.22, radius: 3.45, height: 0.7, focus: 'BodyWindshield', fov: 30 },
-  { at: 0.29, angle: 0.22, radius: 3.45, height: 0.7, focus: 'BodyWindshield', fov: 30 },
-  { at: 0.3, angle: 0.58, radius: 7.4, height: 0.34, target: [0, 0.62, 0], fov: 32 },
-  { at: 0.39, angle: 0.58, radius: 7.4, height: 0.34, target: [0, 0.62, 0], fov: 32 },
-  { at: 0.4, angle: -0.36, radius: 2.35, height: 0.4, focus: 'WheelFrontRBrakeDisc', fov: 26 },
-  { at: 0.51, angle: -0.36, radius: 2.35, height: 0.4, focus: 'WheelFrontRBrakeDisc', fov: 26 },
-  { at: 0.52, angle: -1.57, radius: 7.5, height: 0.83, target: [0, 0.62, 0], fov: 34 },
-  { at: 0.63, angle: -1.57, radius: 7.5, height: 0.83, target: [0, 0.62, 0], fov: 34 },
-  { at: 0.64, angle: -2.58, radius: 2.4, height: 0.42, focus: 'WheelRearRRim', fov: 26 },
-  { at: 0.75, angle: -2.58, radius: 2.4, height: 0.42, focus: 'WheelRearRRim', fov: 26 },
-  { at: 0.76, angle: -2.58, radius: 7.5, height: 0.95, target: [0, 0.62, 0], fov: 33 },
-  { at: 0.78, angle: -3.14, radius: 7.5, height: 0.9, target: [0, 0.62, 0], fov: 33 },
-  { at: 0.8, angle: -4.7, radius: 7.4, height: 0.85, target: [0, 0.62, 0], fov: 33 },
-  { at: 0.82, angle: -6.1, radius: 6.8, height: 0.82, focus: 'BodyWindshield', fov: 32 },
-  { at: 0.83, angle: -6.1, radius: 3.7, height: 0.5, focus: 'InteriorSeatsColor1', fov: 27 },
-  { at: 0.87, angle: -6.1, radius: 3.7, height: 0.5, focus: 'InteriorSeatsColor1', fov: 27 },
-  { at: 0.88, angle: -6.1, radius: 5.8, height: 0.95, target: [0, 0.62, 0], fov: 32 },
-  { at: 0.94, angle: -6.1, radius: 7.5, height: 0.92, target: [0, 0.62, 0], fov: 34 },
-  { at: 1, angle: -6.1, radius: 7.5, height: 0.92, target: [0, 0.62, 0], fov: 34 },
-]
+const CAR_CENTER = [0, 0.55, 0]
 
-const MOBILE_STOPS = DESKTOP_STOPS.map((stop) => ({
-  ...stop,
-  radius: stop.radius * 1.16,
-  height: stop.height + 0.14,
-  fov: stop.fov + 16,
-}))
-
-const smoothstep = (value) => value * value * (3 - 2 * value)
-
-function resolveTarget(stop, focusTargets) {
-  const target = (stop.focus && focusTargets[stop.focus]) || stop.target || [0, 0.62, 0]
-  return target.map((value, index) => value + (stop.aimOffset?.[index] || 0))
+// Camera keyframes. Orbit stops circle a target ({angle, radius, height});
+// eye stops place the camera directly and aim it by yaw/pitch. `shift` slides
+// the framing sideways (fraction of the viewport) to make room for the copy.
+function buildStops(anchors) {
+  const { wheel, eye, steering } = anchors
+  const wheelFocus = [wheel.x + 0.75, wheel.y + 0.02, wheel.z + 0.1]
+  return [
+    // 01 Hero, white studio.
+    // The car sits low and right so it clears the headline at top left.
+    { at: 0, angle: 0.72, radius: 10, height: 0.95, target: [0, 1.05, 0], fov: 32, shift: 0.15 },
+    { at: 0.06, angle: 0.62, radius: 9.8, height: 1.0, target: [0, 1.0, 0], fov: 32, shift: 0.15 },
+    // 02 Exploded view: elevated, locked on the car while it comes apart.
+    { at: 0.1, angle: 0.92, radius: 11.6, height: 3.6, target: [0, 0.85, 0], fov: 34, shift: 0.14 },
+    { at: 0.2, angle: 1.2, radius: 11.8, height: 3.9, target: [0, 0.9, 0], fov: 34, shift: 0.14 },
+    { at: 0.245, angle: 1.45, radius: 10.4, height: 3.2, target: [0, 0.75, 0], fov: 34, shift: 0.02 },
+    // 03 X-ray: high rear three-quarter so the cell, engine and corners read.
+    { at: 0.29, angle: 2.2, radius: 8.9, height: 3.3, target: [0, 0.6, -0.2], fov: 34, shift: -0.14 },
+    { at: 0.39, angle: 2.55, radius: 8.6, height: 3.0, target: [0, 0.6, -0.2], fov: 34, shift: -0.14 },
+    { at: 0.415, angle: 2.2, radius: 8.6, height: 2.2, target: CAR_CENTER, fov: 34, shift: 0 },
+    // 04 Wheel teardown, front-left corner.
+    { at: 0.45, angle: 0.42, radius: 4.9, height: 0.45, target: wheelFocus, fov: 30, shift: 0.19 },
+    { at: 0.53, angle: 0.55, radius: 4.6, height: 0.4, target: wheelFocus, fov: 30, shift: 0.19 },
+    { at: 0.565, angle: 1.45, radius: 8.6, height: 0.75, target: CAR_CENTER, fov: 31, shift: 0 },
+    // 05 Carbon chamber, low and slow around the side.
+    { at: 0.6, angle: 1.62, radius: 8.6, height: 0.2, target: [0, 0.95, 0], fov: 30, shift: 0 },
+    { at: 0.67, angle: 2.25, radius: 8.1, height: 0.3, target: [0, 0.95, 0], fov: 30, shift: 0 },
+    // 06 Cockpit entry: swing to the nose, glide over the hood, through the
+    // windscreen and turn into the driver's seat.
+    { at: 0.69, angle: 0.2, radius: 8.2, height: 0.8, target: [eye.x, 0.8, 0], fov: 34, shift: 0 },
+    { at: 0.705, eye: [eye.x, 1.35, 6.4], yaw: Math.PI, pitch: -0.1, fov: 36 },
+    { at: 0.73, eye: [eye.x, 1.12, 3.1], yaw: Math.PI, pitch: -0.12, fov: 40 },
+    { at: 0.748, eye: [eye.x, eye.y + 0.04, steering.z + 0.85], yaw: Math.PI, pitch: -0.12, fov: 46 },
+    { at: 0.765, eye: [eye.x - 0.12, eye.y + 0.02, steering.z - 0.05], yaw: Math.PI * 1.45, pitch: -0.18, fov: 56 },
+    { at: 0.785, eye: [eye.x, eye.y, eye.z], yaw: Math.PI * 2, pitch: -0.2, fov: 60 },
+    { at: 0.85, eye: [eye.x, eye.y, eye.z], yaw: Math.PI * 2, pitch: -0.2, fov: 60 },
+    // 07 Circuit: hard cut (hidden by the dip to black) to a low tracking shot.
+    { at: 0.852, angle: 0.62, radius: 7.4, height: 0.25, target: [0, 0.6, 0.3], fov: 30, shift: 0, cut: true },
+    { at: 0.93, angle: 0.36, radius: 8.2, height: 0.55, target: [0, 0.65, 0], fov: 31, shift: 0 },
+    { at: 1, angle: 0.22, radius: 9.2, height: 0.95, target: [0, 0.7, 0], fov: 33, shift: 0 },
+  ]
 }
 
-function sampleCamera(stops, progress, focusTargets) {
-  const clamped = THREE.MathUtils.clamp(progress, 0, 1)
-  let from = stops[0]
-  let to = stops[stops.length - 1]
-  for (let index = 0; index < stops.length - 1; index += 1) {
-    if (clamped >= stops[index].at && clamped <= stops[index + 1].at) {
-      from = stops[index]
-      to = stops[index + 1]
-      break
+const smooth = (value) => value * value * (3 - 2 * value)
+const lerp = THREE.MathUtils.lerp
+
+function lookTarget(stop) {
+  if (stop.target && !stop.eye) return stop.target
+  const [x, y, z] = stop.eye
+  const yaw = stop.yaw ?? 0
+  const pitch = stop.pitch ?? 0
+  return [x + Math.sin(yaw) * Math.cos(pitch) * 2, y + Math.sin(pitch) * 2, z + Math.cos(yaw) * Math.cos(pitch) * 2]
+}
+
+function orbitPosition(target, angle, radius, height) {
+  return [target[0] + Math.sin(angle) * radius, target[1] + height, target[2] + Math.cos(angle) * radius]
+}
+
+function sampleCamera(stops, progress, mobile) {
+  const p = THREE.MathUtils.clamp(progress, 0, 1)
+  let index = stops.findIndex((stop, i) => i < stops.length - 1 && p >= stop.at && p <= stops[i + 1].at)
+  if (index === -1) index = stops.length - 2
+  const from = stops[index]
+  const to = stops[index + 1]
+  const t = to.cut ? (p >= to.at ? 1 : 0) : smooth(THREE.MathUtils.clamp((p - from.at) / (to.at - from.at || 1), 0, 1))
+  const scale = mobile ? 1.28 : 1
+  const fovBoost = (stop) => (mobile ? (stop.eye ? 12 : 16) : 0)
+
+  let position
+  let target
+  if (!from.eye && !to.eye) {
+    // Orbit to orbit: interpolate the orbit itself so the camera arcs.
+    target = from.target.map((value, axis) => lerp(value, to.target[axis], t))
+    position = orbitPosition(
+      target,
+      lerp(from.angle, to.angle, t),
+      lerp(from.radius, to.radius, t) * scale,
+      lerp(from.height, to.height, t) + (mobile ? 0.25 : 0),
+    )
+  } else {
+    const point = (stop) =>
+      stop.eye || orbitPosition(stop.target, stop.angle, stop.radius * scale, stop.height + (mobile ? 0.25 : 0))
+    const a = point(from)
+    const b = point(to)
+    position = a.map((value, axis) => lerp(value, b[axis], t))
+    if (from.eye && to.eye && from.yaw !== undefined && to.yaw !== undefined) {
+      // Turn the head by yaw, not by a straight line between look points.
+      const yaw = lerp(from.yaw, to.yaw, t)
+      const pitch = lerp(from.pitch ?? 0, to.pitch ?? 0, t)
+      target = lookTarget({ eye: position, yaw, pitch })
+    } else {
+      const ta = lookTarget(from)
+      const tb = lookTarget(to)
+      target = ta.map((value, axis) => lerp(value, tb[axis], t))
     }
   }
-
-  const range = to.at - from.at || 1
-  const local = smoothstep(THREE.MathUtils.clamp((clamped - from.at) / range, 0, 1))
-  const fromTarget = resolveTarget(from, focusTargets)
-  const toTarget = resolveTarget(to, focusTargets)
-  const target = fromTarget.map((value, index) => THREE.MathUtils.lerp(value, toTarget[index], local))
-  const angle = THREE.MathUtils.lerp(from.angle, to.angle, local)
-  const radius = THREE.MathUtils.lerp(from.radius, to.radius, local)
-  const cameraLift = THREE.MathUtils.lerp(from.height, to.height, local)
 
   return {
-    position: [
-      target[0] + Math.sin(angle) * radius,
-      target[1] + cameraLift,
-      target[2] + Math.cos(angle) * radius,
-    ],
+    position,
     target,
-    fov: THREE.MathUtils.lerp(from.fov, to.fov, local),
+    fov: lerp(from.fov + fovBoost(from), to.fov + fovBoost(to), t),
+    shift: mobile ? 0 : lerp(from.shift ?? 0, to.shift ?? 0, t),
+    interior: (from.eye ? 1 - t : 0) + (to.eye ? t : 0),
   }
 }
 
-function CinematicCar({ source }) {
-  const car = useMemo(() => instantiateCar(source, { cloneMaterials: true }), [source])
-  const basePosition = useMemo(() => car?.position.clone(), [car])
-  const wheelObjects = useMemo(() => {
-    if (!car) return []
-    return ['WheelFrontL', 'WheelFrontR', 'WheelRearL', 'WheelRearR']
-      .map((name) => car.getObjectByName(name))
-      .filter(Boolean)
-      .map((wheel) => ({ wheel, rotation: wheel.rotation.x }))
-  }, [car])
-
-  useFrame(() => {
-    if (!car || !basePosition) return
-    const drive = smoothstep(THREE.MathUtils.clamp((cinematicState.progress - 0.87) / 0.13, 0, 1))
-    const distance = drive * 2.2
-    car.position.set(basePosition.x, basePosition.y, basePosition.z + distance)
-    wheelObjects.forEach(({ wheel, rotation }) => {
-      wheel.rotation.x = rotation + drive * 18
-    })
-  })
-
-  return car ? <primitive object={car} /> : null
-}
-
-function CinematicRunway() {
-  const roadRef = useRef(null)
-  const leftEdgeRef = useRef(null)
-  const rightEdgeRef = useRef(null)
-  const dashesRef = useRef([])
-
-  useFrame(() => {
-    const progress = THREE.MathUtils.clamp((cinematicState.progress - 0.86) / 0.14, 0, 1)
-    const reveal = smoothstep(progress)
-    const roadDistance = progress * 16
-    const road = roadRef.current
-    if (road) {
-      road.material.opacity = reveal * 0.96
-      road.visible = reveal > 0.002
-    }
-    ;[leftEdgeRef.current, rightEdgeRef.current].forEach((edge) => {
-      if (!edge) return
-      edge.material.opacity = reveal * 0.86
-      edge.visible = reveal > 0.002
-    })
-    dashesRef.current.forEach((dash, index) => {
-      if (!dash) return
-      const base = -38 + index * 4
-      dash.position.z = ((((base - roadDistance + 40) % 80) + 80) % 80) - 40
-      dash.material.opacity = reveal * 0.8
-      dash.visible = reveal > 0.002
-    })
-  })
-
-  return (
-    <group>
-      <mesh ref={roadRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.008, 0]} visible={false}>
-        <planeGeometry args={[11, 100]} />
-        <meshStandardMaterial color="#252a2e" roughness={0.9} metalness={0.06} transparent opacity={0} />
-      </mesh>
-      <mesh ref={leftEdgeRef} rotation={[-Math.PI / 2, 0, 0]} position={[-4.15, -0.002, 0]} visible={false}>
-        <planeGeometry args={[0.035, 100]} />
-        <meshBasicMaterial color="#a8b2b6" transparent opacity={0} toneMapped={false} />
-      </mesh>
-      <mesh ref={rightEdgeRef} rotation={[-Math.PI / 2, 0, 0]} position={[4.15, -0.002, 0]} visible={false}>
-        <planeGeometry args={[0.035, 100]} />
-        <meshBasicMaterial color="#a8b2b6" transparent opacity={0} toneMapped={false} />
-      </mesh>
-      {Array.from({ length: 20 }, (_, index) => (
-        <mesh
-          key={index}
-          ref={(node) => { dashesRef.current[index] = node }}
-          rotation={[-Math.PI / 2, 0, 0]}
-          position={[0, 0.002, -38 + index * 4]}
-          visible={false}
-        >
-          <planeGeometry args={[0.09, 1.8]} />
-          <meshBasicMaterial color="#c7cbca" transparent opacity={0} toneMapped={false} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-function StudioRoom() {
-  const wallMaterials = useRef([])
-  const bright = useMemo(() => new THREE.Color('#858d8e'), [])
-  const dark = useMemo(() => new THREE.Color('#07101b'), [])
-  const road = useMemo(() => new THREE.Color('#20262c'), [])
-
-  useFrame(() => {
-    const p = THREE.MathUtils.clamp(cinematicState.progress, 0, 1)
-    const studio = THREE.MathUtils.smoothstep(p, 0.46, 0.57)
-    const driving = THREE.MathUtils.smoothstep(p, 0.84, 0.98)
-    wallMaterials.current.forEach((material) => {
-      if (!material) return
-      material.color.copy(bright).lerp(dark, studio).lerp(road, driving)
-      material.opacity = 1 - driving
-      material.visible = driving < 0.995
-    })
-  })
-
-  const addWallMaterial = (index) => (material) => {
-    wallMaterials.current[index] = material
-  }
-
-  return (
-    <group>
-      <mesh position={[0, 4.9, -11]}>
-        <planeGeometry args={[36, 10]} />
-        <meshStandardMaterial ref={addWallMaterial(0)} color="#858d8e" roughness={0.72} metalness={0.12} transparent depthWrite={false} />
-      </mesh>
-      <mesh position={[0, 4.9, 11]} rotation={[0, Math.PI, 0]}>
-        <planeGeometry args={[36, 10]} />
-        <meshStandardMaterial ref={addWallMaterial(1)} color="#858d8e" roughness={0.72} metalness={0.12} transparent depthWrite={false} />
-      </mesh>
-      <mesh position={[-11, 4.9, 0]} rotation={[0, Math.PI / 2, 0]}>
-        <planeGeometry args={[22, 10]} />
-        <meshStandardMaterial ref={addWallMaterial(2)} color="#858d8e" roughness={0.72} metalness={0.12} transparent depthWrite={false} />
-      </mesh>
-      <mesh position={[11, 4.9, 0]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[22, 10]} />
-        <meshStandardMaterial ref={addWallMaterial(3)} color="#858d8e" roughness={0.72} metalness={0.12} transparent depthWrite={false} />
-      </mesh>
-    </group>
-  )
-}
-
-function CameraRig({ reduced, focusTargets }) {
+function CameraRig({ reduced, anchors }) {
   const camera = useThree((state) => state.camera)
   const size = useThree((state) => state.size)
-  const isMobile = size.width < 780
+  const mobile = size.width < 780
+  const stops = useMemo(() => buildStops(anchors), [anchors])
   const target = useRef(new THREE.Vector3())
-  const desiredPosition = useRef(new THREE.Vector3())
+  const desired = useRef(new THREE.Vector3())
   const desiredTarget = useRef(new THREE.Vector3())
-  const focusLightRef = useRef(null)
-  const focusLightTargetRef = useRef(null)
-  const initialized = useRef(false)
+  const lastDesired = useRef(null)
+  const shift = useRef(0)
 
   useEffect(() => {
-    const initial = sampleCamera(
-      isMobile ? MOBILE_STOPS : DESKTOP_STOPS,
-      cinematicState.progress,
-      focusTargets,
-    )
+    const initial = sampleCamera(stops, cinematicState.progress, mobile)
     camera.position.set(...initial.position)
     target.current.set(...initial.target)
     camera.fov = initial.fov
-    camera.updateProjectionMatrix()
     camera.lookAt(target.current)
-    initialized.current = true
-  }, [camera, focusTargets, isMobile])
+    camera.updateProjectionMatrix()
+    lastDesired.current = null
+  }, [camera, stops, mobile])
 
   useFrame((state, delta) => {
-    if (!initialized.current) return
     const progress = cinematicState.progress
-    const stops = isMobile ? MOBILE_STOPS : DESKTOP_STOPS
-    const sample = sampleCamera(stops, progress, focusTargets)
-    const drive = smoothstep(THREE.MathUtils.clamp((progress - 0.87) / 0.13, 0, 1))
+    updateDrive(progress, delta, reduced)
+    const sample = sampleCamera(stops, progress, mobile)
     const time = state.clock.elapsedTime
-    const drift = reduced ? 0 : 1
+    const drift = reduced ? 0 : 1 - sample.interior * 0.7
 
-    const mobileDriveShift = isMobile ? smoothstep(THREE.MathUtils.clamp((progress - 0.88) / 0.07, 0, 1)) * 1.05 : 0
-    desiredPosition.current
-      .set(...sample.position)
-      .add(new THREE.Vector3(
-        Math.sin(time * 0.19) * 0.022 * drift,
-        Math.sin(time * 0.23 + 1.4) * 0.016 * drift,
-        drive * 2.2,
-      ))
-    desiredPosition.current.y -= mobileDriveShift
+    desired.current.set(...sample.position)
+    desired.current.x += Math.sin(time * 0.19) * 0.022 * drift
+    desired.current.y += Math.sin(time * 0.23 + 1.4) * 0.016 * drift
     desiredTarget.current.set(...sample.target)
-    desiredTarget.current.z += drive * 2.2
-    desiredTarget.current.y -= mobileDriveShift
-
-    if (!reduced) {
-      desiredTarget.current.x += cinematicState.pointerX * (isMobile ? 0.04 : 0.08)
-      desiredTarget.current.y += cinematicState.pointerY * (isMobile ? 0.02 : 0.035)
+    if (!reduced && sample.interior < 0.5) {
+      desiredTarget.current.x += cinematicState.pointerX * (mobile ? 0.04 : 0.08)
+      desiredTarget.current.y += cinematicState.pointerY * (mobile ? 0.02 : 0.035)
     }
 
-    const damping = 1 - Math.exp(-delta * 4.5)
-    camera.position.lerp(desiredPosition.current, damping)
+    // Large jumps in the keyframes are cuts: snap instead of flying through the car.
+    const jumped = lastDesired.current && lastDesired.current.distanceTo(desired.current) > 1.5
+    lastDesired.current = (lastDesired.current || new THREE.Vector3()).copy(desired.current)
+    const damping = jumped ? 1 : 1 - Math.exp(-delta * (sample.interior > 0.1 ? 6 : 4.5))
+    camera.position.lerp(desired.current, damping)
     target.current.lerp(desiredTarget.current, damping)
     camera.lookAt(target.current)
+
+    const nextFov = jumped ? sample.fov : THREE.MathUtils.damp(camera.fov, sample.fov, 4, delta)
+    const near = lerp(0.1, 0.02, sample.interior)
+    shift.current = jumped ? sample.shift : THREE.MathUtils.damp(shift.current, sample.shift, 4, delta)
+    camera.fov = nextFov
+    camera.near = near
+    if (Math.abs(shift.current) > 0.0005) {
+      camera.setViewOffset(size.width, size.height, -shift.current * size.width, 0, size.width, size.height)
+    } else if (camera.view?.enabled) {
+      camera.clearViewOffset()
+    }
+    camera.updateProjectionMatrix()
 
     if (import.meta.env.DEV && typeof window !== 'undefined') {
       window.__apexCamera = {
         progress,
-        mobile: isMobile,
+        mobile,
         position: camera.position.toArray(),
         target: target.current.toArray(),
         fov: camera.fov,
       }
     }
-
-    if (focusLightRef.current && focusLightTargetRef.current) {
-      focusLightTargetRef.current.position.copy(target.current)
-      focusLightTargetRef.current.updateWorldMatrix(true, false)
-      focusLightRef.current.position.set(
-        camera.position.x + 0.25,
-        camera.position.y + 0.8,
-        camera.position.z + 0.25,
-      )
-      const detail = (progress > 0.38 && progress < 0.52) || (progress > 0.62 && progress < 0.76)
-      const intensity = detail ? 9 : progress > 0.08 && progress < 0.88 ? 4 : 0
-      focusLightRef.current.intensity = THREE.MathUtils.damp(
-        focusLightRef.current.intensity,
-        intensity,
-        5,
-        delta,
-      )
-    }
-
-    if (Math.abs(camera.fov - sample.fov) > 0.01) {
-      camera.fov = THREE.MathUtils.damp(camera.fov, sample.fov, 4, delta)
-      camera.updateProjectionMatrix()
-    }
   })
 
-  return (
-    <spotLight
-      ref={focusLightRef}
-      color="#c4efd8"
-      intensity={0}
-      angle={0.42}
-      penumbra={0.85}
-      distance={8}
-      decay={2}
-      castShadow={false}
-    >
-      <object3D ref={focusLightTargetRef} attach="target" />
-    </spotLight>
-  )
+  return null
+}
+
+// Shadows are redrawn only when something moves: a scroll step, the floating
+// panels of the exploded view, or the wheels turning on the circuit.
+function ShadowScheduler() {
+  const gl = useThree((state) => state.gl)
+  const lastProgress = useRef(-1)
+  const frame = useRef(0)
+
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+    return () => {
+      gl.shadowMap.autoUpdate = true
+    }
+  }, [gl])
+
+  useFrame(() => {
+    const progress = cinematicState.progress
+    frame.current += 1
+    const floating = progress > TIMELINE.explode.parts.frontBumper[0] && progress < TIMELINE.explode.reassemble[1]
+    const driving = progress > TIMELINE.drive[0] && frame.current % 3 === 0
+    if (progress !== lastProgress.current || floating || driving) gl.shadowMap.needsUpdate = true
+    lastProgress.current = progress
+  })
+
+  return null
+}
+
+// Compiles every shader the story will need, including the see-through X-ray
+// variants, right after the car loads instead of mid-scroll.
+function ShaderWarmup({ rig }) {
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+
+  useEffect(() => {
+    if (!rig) return
+    applyShell(rig, 0.5)
+    gl.compile(scene, camera)
+    applyShell(rig, 0)
+    gl.compileAsync(scene, camera).catch(() => {})
+  }, [rig, gl, scene, camera])
+
+  return null
 }
 
 export function CinematicScene({ model, active = true, reduced = false, className = '' }) {
-  const focusTargets = useMemo(() => {
-    if (!model) return {}
-    const car = instantiateCar(model)
-    car.updateMatrixWorld(true)
-    const names = [
-      'BodyHood',
-      'BodyWindshield',
-      'BodyUnderside',
-      'WheelFrontRBrakeDisc',
-      'WheelRearRRim',
-      'InteriorSteeringWheel01',
-      'InteriorSeatsColor1',
-      'BodyTaillights',
-    ]
-    return Object.fromEntries(
-      names.flatMap((name) => {
-        const part = car.getObjectByName(name)
-        if (!part) return []
-        const bounds = new THREE.Box3().setFromObject(part)
-        const center = bounds.getCenter(new THREE.Vector3())
-        return [[name, center.toArray()]]
-      }),
-    )
-  }, [model])
+  const [rig, setRig] = useState(null)
+  const labels = useRef({})
+  const maxDpr = typeof window === 'undefined' ? 1.5 : Math.min(window.devicePixelRatio || 1, 1.5)
+  const [dpr, setDpr] = useState(Math.min(maxDpr, 1.25))
+  const onRig = useCallback((next) => setRig(next), [])
+  const anchors = useMemo(() => {
+    if (!rig) return null
+    const steering = rig.cockpit.steering
+    return {
+      wheel: rig.wheel.center,
+      steering,
+      eye: new THREE.Vector3(steering.x, steering.y + 0.21, steering.z - 0.5),
+    }
+  }, [rig])
 
   useEffect(() => {
-    if (!import.meta.env.DEV || !model || typeof window === 'undefined') return undefined
-    let meshes = 0
-    model.traverse((object) => {
-      if (object.isMesh) meshes += 1
-    })
-    window.__apexModelReady = { meshes, focusTargets: Object.keys(focusTargets) }
+    if (!import.meta.env.DEV || !rig || typeof window === 'undefined') return undefined
+    window.__apexRig = rig
+    window.__apexModelReady = {
+      parts: rig.tracks.length,
+      shell: rig.shell.length,
+      xray: rig.xray.map((component) => `${component.key}:${component.materials.length}`),
+      steering: rig.cockpit.steering.toArray().map((value) => Number(value.toFixed(2))),
+    }
     return () => {
       window.__apexCamera = null
       window.__apexModelReady = null
+      window.__apexRig = null
     }
-  }, [focusTargets, model])
+  }, [rig])
 
   if (!model) return null
 
@@ -358,9 +270,9 @@ export function CinematicScene({ model, active = true, reduced = false, classNam
     <div className={`cinematic-scene ${className}`.trim()} aria-hidden="true">
       <Canvas
         frameloop={active && !reduced ? 'always' : 'demand'}
-        dpr={[1, 1.55]}
+        dpr={dpr}
         shadows
-        camera={{ position: [5.15, 2.1, 6.9], fov: 34, near: 0.1, far: 90 }}
+        camera={{ position: [6.8, 1.8, 6.9], fov: 32, near: 0.1, far: 240 }}
         gl={{
           antialias: true,
           alpha: true,
@@ -368,16 +280,17 @@ export function CinematicScene({ model, active = true, reduced = false, classNam
           toneMapping: THREE.ACESFilmicToneMapping,
         }}
         onCreated={({ gl }) => {
-          gl.toneMappingExposure = 1.12
+          if (import.meta.env.DEV) window.__apexGl = gl
         }}
       >
-        <CameraRig reduced={reduced} focusTargets={focusTargets} />
-        <StudioLighting progressSource={cinematicState} />
-        <CinematicCar source={model} />
-        <StudioRoom />
-        <StudioFloor />
-        <CinematicRunway />
+        <PerformanceMonitor onIncline={() => setDpr(maxDpr)} onDecline={() => setDpr(1)} flipflops={3} onFallback={() => setDpr(1)} />
+        {anchors && <CameraRig reduced={reduced} anchors={anchors} />}
+        <ShadowScheduler />
+        <ShaderWarmup rig={rig} />
+        <CinematicWorld reflective={typeof window === 'undefined' || window.innerWidth >= 780} />
+        <CinematicCar source={model} onRig={onRig} labels={labels} />
       </Canvas>
+      <SceneLabelLayer registry={labels} />
     </div>
   )
 }

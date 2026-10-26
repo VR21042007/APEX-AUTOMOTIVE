@@ -75,7 +75,7 @@ function PresentationRing() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, 0]}>
       <ringGeometry args={[3.05, 3.075, 128]} />
-      <meshBasicMaterial color="#00b87a" transparent opacity={0.16} side={THREE.DoubleSide} />
+      <meshBasicMaterial color="#ff7a00" transparent opacity={0.16} side={THREE.DoubleSide} />
     </mesh>
   )
 }

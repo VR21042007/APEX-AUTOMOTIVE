@@ -53,7 +53,8 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(1)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.toneMapping = THREE.ACESFilmicToneMapping
-renderer.toneMappingExposure = config.exposure
+// The P1's metallic Papaya clips under the original exposure; scale it down.
+renderer.toneMappingExposure = config.exposure * 0.78
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -73,7 +74,7 @@ const pmrem = new THREE.PMREMGenerator(renderer)
 const envScene = new RoomEnvironment()
 const envMap = pmrem.fromScene(envScene, 0.04).texture
 scene.environment = envMap
-scene.environmentIntensity = config.env
+scene.environmentIntensity = config.env * 0.6
 
 const ambient = new THREE.AmbientLight('#f8eadd', 0.34)
 scene.add(ambient)

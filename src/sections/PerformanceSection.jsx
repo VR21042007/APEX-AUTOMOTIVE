@@ -1,6 +1,6 @@
 import { ArrowUpRight } from 'lucide-react'
 import { PERFORMANCE_ROWS, PERFORMANCE_STATS } from '../data/content'
-import { Button, Reveal, SectionLabel } from '../components/ui'
+import { Button, CountUp, Reveal, SectionLabel } from '../components/ui'
 import { smoothScrollTo } from '../lib/scroll'
 
 export function PerformanceSection() {
@@ -37,7 +37,7 @@ export function PerformanceSection() {
           <Reveal key={stat.label} className="performance-stat" delay={0.06 * index}>
             <span className="performance-stat__index">0{index + 1}</span>
             <div className="performance-stat__value">
-              {stat.value}
+              <CountUp value={stat.value} delay={0.15 + 0.12 * index} />
               <small>{stat.unit}</small>
             </div>
             <span className="performance-stat__label">{stat.label}</span>

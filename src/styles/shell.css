@@ -288,7 +288,7 @@
   padding: 96px var(--pad) 32px;
   overflow-y: auto;
   background:
-    radial-gradient(circle at 80% 0%, rgba(0, 184, 122, 0.12), transparent 36%),
+    radial-gradient(circle at 80% 0%, rgba(var(--accent-rgb), 0.12), transparent 36%),
     #080807;
 }
 
@@ -360,4 +360,37 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+/* Over the white studio at the top of the page the unscrolled header switches to ink. */
+
+.site-header:not(.site-header--scrolled) {
+  --header-fg: color-mix(in srgb, #0d1210 calc(var(--story-light, 0) * 100%), #f3efe7);
+}
+
+.site-header:not(.site-header--scrolled) .wordmark,
+.site-header:not(.site-header--scrolled) .wordmark__mark,
+.site-header:not(.site-header--scrolled) .header-cta,
+.site-header:not(.site-header--scrolled) .menu-toggle {
+  color: var(--header-fg);
+}
+
+.site-header:not(.site-header--scrolled) .wordmark__meta,
+.site-header:not(.site-header--scrolled) .site-nav a {
+  color: color-mix(in srgb, var(--header-fg) 65%, transparent);
+}
+
+.site-header:not(.site-header--scrolled) .wordmark__meta,
+.site-header:not(.site-header--scrolled) .header-cta,
+.site-header:not(.site-header--scrolled) .menu-toggle {
+  border-color: color-mix(in srgb, var(--header-fg) 28%, transparent);
+}
+
+.site-header:not(.site-header--scrolled) .site-nav a:hover,
+.site-header:not(.site-header--scrolled) .header-cta:hover {
+  color: var(--header-fg);
+}
+
+.site-header:not(.site-header--scrolled) .header-cta:hover {
+  color: var(--ink);
 }

@@ -136,8 +136,8 @@ export function ExperienceSection({ model }) {
       </div>
 
       <p className="experience__credit">
-        Live vehicle model: “Car Concept” by Eric Chadwick / Darmstadt Graphics
-        Group, licensed CC BY 4.0. Adapted for this fictional concept.
+        Live vehicle model: “Mclaren P1 | www.vecarz.com” by vecarz, licensed
+        CC BY 4.0 via Sketchfab. Repainted and optimised for the web.
       </p>
     </section>
   )

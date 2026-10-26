@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowDown, ArrowUpRight } from 'lucide-react'
 import { STORY_STAGES } from '../data/content'
 import { cinematicState } from '../lib/cinematicState'
+import { STAGE_COUNT, environmentWeights, getStage, pulse } from '../lib/cinematicTimeline'
 import { scrollToPageProgress, smoothScrollTo, supportsWebGL } from '../lib/scroll'
 import { CinematicScene } from '../three/CinematicScene'
 import { ArrowLink, Button, SectionLabel } from './ui'
@@ -11,22 +12,33 @@ import { useReducedMotion } from '../hooks/useMediaQuery'
 
 gsap.registerPlugin(ScrollTrigger)
 
-const STAGE_THRESHOLDS = [0.09, 0.2, 0.3, 0.4, 0.52, 0.64, 0.76, 0.88]
+const STAGE_TOTAL = String(STAGE_COUNT).padStart(2, '0')
+
+const writtenVars = new WeakMap()
+
+// Writes a CSS custom property only when its value changes. Setting a variable
+// on <html> restyles the whole page, so unchanged writes are skipped.
+function setVar(element, name, value) {
+  let written = writtenVars.get(element)
+  if (!written) {
+    written = {}
+    writtenVars.set(element, written)
+  }
+  if (written[name] === value) return
+  written[name] = value
+  element.style.setProperty(name, value)
+}
 
 function syncCinematicComposition(frame, progress) {
   if (!frame) return
   const p = Math.max(0, Math.min(1, progress))
-  const studioDark = Math.max(0, Math.min(1, (p - 0.46) / 0.11))
-  const easedDark = studioDark * studioDark * (3 - 2 * studioDark)
-  frame.style.setProperty('--story-progress', `${p * 100}%`)
-  frame.style.setProperty('--intro-away', String(Math.max(0, Math.min(1, p / 0.105))))
-  frame.style.setProperty('--bright-studio', `${(1 - easedDark) * 100}%`)
-  frame.style.setProperty('--studio-opacity', String(1 - easedDark))
-}
-
-function getStage(progress) {
-  const nextStage = STAGE_THRESHOLDS.findIndex((threshold) => progress < threshold)
-  return nextStage === -1 ? STAGE_THRESHOLDS.length : nextStage
+  const { studio } = environmentWeights(p)
+  setVar(frame, '--intro-away', Math.max(0, Math.min(1, p / 0.07)).toFixed(3))
+  // 1 in the white studio, 0 in the carbon chamber and on the circuit.
+  setVar(frame, '--light', studio.toFixed(3))
+  // Dip to black that hides the cut from the cockpit to the circuit.
+  setVar(frame, '--dip', pulse(p, 0.836, 0.849, 0.856, 0.872).toFixed(3))
+  setVar(document.documentElement, '--story-light', studio.toFixed(2))
 }
 
 function StageAnnotation({ stage, active }) {
@@ -111,7 +123,7 @@ export function CinematicJourney({ model, ready }) {
   const [inView, setInView] = useState(true)
   const [webgl] = useState(() => supportsWebGL())
   const staticMode = reducedMotion || !webgl
-  const activeLabel = activeStage === 0 ? 'Front reveal' : STORY_STAGES[activeStage - 1]?.label
+  const activeLabel = activeStage === 0 ? 'White studio' : STORY_STAGES[activeStage - 1]?.label
 
   useEffect(() => {
     const node = frameRef.current
@@ -143,7 +155,7 @@ export function CinematicJourney({ model, ready }) {
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top top',
-          end: () => `+=${window.innerHeight * (window.innerWidth < 780 ? 8 : 7.4)}`,
+          end: () => `+=${window.innerHeight * (window.innerWidth < 780 ? 11 : 10)}`,
           pin: frameRef.current,
           pinSpacing: true,
           scrub: 1,
@@ -173,6 +185,8 @@ export function CinematicJourney({ model, ready }) {
       context.revert()
       window.__apexStory = null
       cinematicState.progress = 0
+      document.documentElement.style.removeProperty('--story-light')
+      writtenVars.delete(document.documentElement)
     }
   }, [staticMode])
 
@@ -193,15 +207,9 @@ export function CinematicJourney({ model, ready }) {
       className={`cinematic-track${staticMode ? ' cinematic-track--static' : ''}${
         ready ? ' cinematic-track--ready' : ''
       }`}
-      aria-label="APEX Astra nine-shot cinematic introduction"
+      aria-label="APEX seven-scene cinematic introduction"
     >
       <div ref={frameRef} className="cinematic-frame" data-stage={activeStage}>
-        <div className="cinematic-ambient" aria-hidden="true">
-          <span className="cinematic-ambient__orb" />
-          <span className="cinematic-ambient__grid" />
-          <span className="cinematic-ambient__architecture" />
-        </div>
-
         {webgl && model && ready ? (
           <CinematicScene model={model} active={inView} reduced={reducedMotion} />
         ) : (
@@ -211,6 +219,7 @@ export function CinematicJourney({ model, ready }) {
         )}
 
         <div className="cinematic-grain" aria-hidden="true" />
+        <div className="cinematic-dip" aria-hidden="true" />
         <div className="cinematic-edge cinematic-edge--left" aria-hidden="true" />
         <div className="cinematic-edge cinematic-edge--right" aria-hidden="true" />
 
@@ -231,7 +240,7 @@ export function CinematicJourney({ model, ready }) {
           </h1>
 
           <div className="hero-side-note" aria-hidden="true">
-              <span>01 / 09</span>
+              <span>01 / {STAGE_TOTAL}</span>
             <span className="hero-side-note__line" />
             <span>A study in motion</span>
           </div>
@@ -253,7 +262,7 @@ export function CinematicJourney({ model, ready }) {
                 >
                   Discover APEX
                 </Button>
-                <button className="text-button" type="button" onClick={() => scrollToPageProgress(0.215)}>
+                <button className="text-button" type="button" onClick={() => scrollToPageProgress(0.16)}>
                   <span>Explore the form</span>
                   <ArrowDown size={15} strokeWidth={1.5} aria-hidden="true" />
                 </button>
@@ -295,7 +304,9 @@ export function CinematicJourney({ model, ready }) {
 
         <div className="journey-progress">
           <div className="journey-progress__meta">
-            <span>{String(activeStage + 1).padStart(2, '0')} / 09</span>
+            <span>
+              {String(activeStage + 1).padStart(2, '0')} / {STAGE_TOTAL}
+            </span>
             <span className="journey-progress__label">{activeLabel}</span>
           </div>
           <span className="journey-progress__track" aria-hidden="true">

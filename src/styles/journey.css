@@ -11,80 +11,11 @@
   min-height: 620px;
   overflow: hidden;
   isolation: isolate;
-  background: color-mix(
-    in srgb,
-    #81898a var(--bright-studio, 100%),
-    #080d13 calc(100% - var(--bright-studio, 100%))
-  );
-  transition: background-color 0.2s linear;
-}
-
-.cinematic-ambient {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.cinematic-ambient::before {
-  position: absolute;
-  top: 9%;
-  right: 12%;
-  width: 44vw;
-  height: 44vw;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(239, 241, 238, 0.34), transparent 67%);
-  mix-blend-mode: screen;
-  content: '';
-}
-
-.cinematic-ambient::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 28%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.38), transparent);
-  content: '';
-}
-
-.cinematic-ambient__orb {
-  position: absolute;
-  top: 45%;
-  left: 50%;
-  width: min(62vw, 820px);
-  height: min(40vw, 520px);
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(239, 241, 238, 0.18), transparent 65%);
-  filter: blur(20px);
-  transform: translate(-50%, -50%);
-}
-
-.cinematic-ambient__grid {
-  position: absolute;
-  inset: 0;
-  opacity: 0.18;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.11) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.075) 1px, transparent 1px);
-  background-size: 14vw 14vw;
-  mask-image: radial-gradient(circle at 50% 50%, black, transparent 66%);
-}
-
-.cinematic-ambient__architecture {
-  position: absolute;
-  top: 8%;
-  right: 11%;
-  bottom: 11%;
-  left: 11%;
-  border: 1px solid rgba(255, 255, 255, 0.19);
-  opacity: var(--studio-opacity, 1);
-  background:
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.22), transparent 1px) top / 100% 22px no-repeat,
-    repeating-linear-gradient(to right, transparent 0 16.65%, rgba(255, 255, 255, 0.085) calc(16.65% + 1px), transparent calc(16.65% + 2px));
-  mask-image: linear-gradient(to bottom, black, transparent 88%);
-  pointer-events: none;
+  --light: 1;
+  --fg: color-mix(in srgb, #0d1210 calc(var(--light) * 100%), #f3efe7);
+  --shade: color-mix(in srgb, #eceeec calc(var(--light) * 100%), #050504);
+  --accent-text: color-mix(in srgb, var(--accent-deep) calc(var(--light) * 100%), var(--accent));
+  background: color-mix(in srgb, #e7e9e7 calc(var(--light) * 100%), #050607);
 }
 
 .cinematic-scene {
@@ -218,7 +149,7 @@
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 12px rgba(0, 184, 122, 0.55);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.55);
 }
 
 .hero-title {
@@ -228,7 +159,7 @@
   z-index: 1;
   color: var(--ivory);
   font-family: var(--font-display);
-  font-size: clamp(86px, 11.6vw, 192px);
+  font-size: clamp(64px, 8.2vw, 138px);
   font-weight: 400;
   letter-spacing: -0.022em;
   line-height: 0.83;
@@ -798,4 +729,260 @@
 
 .cinematic-track--static .journey-fallback img {
   opacity: 0.9;
+}
+
+/* Mood: text follows the environment, ink in the white studio and ivory in the
+   carbon chamber and on the circuit. --light comes from the scroll timeline. */
+
+.cinematic-dip {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #000;
+  opacity: var(--dip, 0);
+  pointer-events: none;
+}
+
+.cinematic-frame .hero-kicker,
+.cinematic-frame .hero-edition {
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+}
+
+.cinematic-frame .hero-kicker span:not(.hero-kicker__dot) {
+  color: color-mix(in srgb, var(--fg) 25%, transparent);
+}
+
+.cinematic-frame .hero-title,
+.cinematic-frame .hero-title__line--two,
+.cinematic-frame .hero-specs dd,
+.cinematic-frame .story-panel__title,
+.cinematic-frame .story-panel--center .story-panel__title span:last-child,
+.cinematic-frame .text-button {
+  color: var(--fg);
+}
+
+.cinematic-frame .hero-title {
+  text-shadow: 0 12px 50px color-mix(in srgb, var(--shade) 30%, transparent);
+}
+
+.cinematic-frame .hero-side-note,
+.cinematic-frame .cinematic-scroll-hint {
+  color: color-mix(in srgb, var(--fg) 40%, transparent);
+}
+
+.cinematic-frame .hero-side-note__line,
+.cinematic-frame .scroll-cue__track {
+  background: color-mix(in srgb, var(--fg) 25%, transparent);
+}
+
+.cinematic-frame .hero-intro > p {
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
+}
+
+.cinematic-frame .hero-specs > div {
+  border-left-color: color-mix(in srgb, var(--fg) 20%, transparent);
+}
+
+.cinematic-frame .hero-specs dt,
+.cinematic-frame .scroll-cue,
+.cinematic-frame .journey-progress__meta,
+.cinematic-frame .story-panel__details dt {
+  color: color-mix(in srgb, var(--fg) 50%, transparent);
+}
+
+.cinematic-frame .section-label {
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+}
+
+.cinematic-frame .story-panel__copy {
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+}
+
+.cinematic-frame .story-panel__details,
+.cinematic-frame .story-panel__details > div {
+  border-color: color-mix(in srgb, var(--fg) 16%, transparent);
+}
+
+.cinematic-frame .story-panel__details dd,
+.cinematic-frame .journey-progress__label {
+  color: color-mix(in srgb, var(--fg) 78%, transparent);
+}
+
+.cinematic-frame .stage-annotation.is-visible {
+  color: color-mix(in srgb, var(--fg) 60%, transparent);
+}
+
+.cinematic-frame .journey-progress__brand {
+  color: color-mix(in srgb, var(--fg) 35%, transparent);
+}
+
+.cinematic-frame .journey-progress__track {
+  background: color-mix(in srgb, var(--fg) 16%, transparent);
+}
+
+.cinematic-frame .cinematic-edge {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--fg) 12%, transparent) 20%,
+    color-mix(in srgb, var(--fg) 12%, transparent) 80%,
+    transparent
+  );
+}
+
+.cinematic-frame .story-panel::before {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--shade) 78%, transparent) 0%,
+    color-mix(in srgb, var(--shade) 40%, transparent) 28%,
+    transparent 56%
+  );
+}
+
+.cinematic-frame .story-panel--right::before {
+  background: linear-gradient(
+    270deg,
+    color-mix(in srgb, var(--shade) 78%, transparent) 0%,
+    color-mix(in srgb, var(--shade) 40%, transparent) 28%,
+    transparent 56%
+  );
+}
+
+.cinematic-frame .story-panel--center::before {
+  background: radial-gradient(
+    ellipse at 50% 30%,
+    color-mix(in srgb, var(--shade) 62%, transparent) 0%,
+    color-mix(in srgb, var(--shade) 32%, transparent) 34%,
+    transparent 64%
+  );
+}
+
+/* Papaya text: deep on the white studio for contrast, bright in the dark. */
+
+.cinematic-frame .section-label__index,
+.cinematic-frame .hero-title__period,
+.cinematic-frame .story-panel__title span:nth-child(2),
+.cinematic-frame .story-panel--center .story-panel__title span:last-child::first-letter,
+.cinematic-frame .journey-progress__meta > span:first-child,
+.cinematic-frame .scene-label__text small {
+  color: var(--accent-text);
+}
+
+/* Labels pinned to parts of the car in the 3D scene. The outer element is
+   positioned per frame; the inner offset anchors the dot on the point. */
+
+.scene-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.scene-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 0;
+  height: 0;
+  align-items: center;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.scene-label > * {
+  flex: 0 0 auto;
+}
+
+.scene-label__dot {
+  margin-left: -4px;
+}
+
+.scene-label--flip {
+  flex-direction: row-reverse;
+}
+
+.scene-label--flip .scene-label__dot {
+  margin-right: -4px;
+  margin-left: 0;
+}
+
+.scene-label__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.8);
+}
+
+.scene-label__line {
+  width: clamp(26px, 3.4vw, 54px);
+  height: 1px;
+  background: var(--accent);
+}
+
+.scene-label__text {
+  display: grid;
+  gap: 3px;
+  padding: 7px 11px 8px;
+  border-left: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--shade) 72%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.scene-label--flip .scene-label__text {
+  border-right: 1px solid var(--accent);
+  border-left: 0;
+  text-align: right;
+}
+
+.scene-label__text small {
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.scene-label__text strong {
+  color: var(--fg);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.scene-label__text em {
+  color: color-mix(in srgb, var(--fg) 62%, transparent);
+  font-size: 9.5px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 780px) {
+  .scene-label__line {
+    width: 18px;
+  }
+
+  /* Narrow screens: every label runs to the right so none is cut off at the edge. */
+  .scene-label--flip {
+    flex-direction: row;
+  }
+
+  .scene-label--flip .scene-label__dot {
+    margin-right: 0;
+    margin-left: -4px;
+  }
+
+  .scene-label--flip .scene-label__text {
+    border-right: 0;
+    border-left: 1px solid var(--accent);
+    text-align: left;
+  }
+
+  .scene-label__text em {
+    display: none;
+  }
 }

@@ -14,8 +14,8 @@ function makeFloorGlowTexture() {
   canvas.height = 512
   const context = canvas.getContext('2d')
   const gradient = context.createRadialGradient(256, 270, 20, 256, 270, 230)
-  gradient.addColorStop(0, 'rgba(21, 108, 75, 0.14)')
-  gradient.addColorStop(0.34, 'rgba(7, 53, 38, 0.2)')
+  gradient.addColorStop(0, 'rgba(120, 58, 10, 0.14)')
+  gradient.addColorStop(0.34, 'rgba(48, 24, 6, 0.2)')
   gradient.addColorStop(0.7, 'rgba(5, 8, 6, 0.16)')
   gradient.addColorStop(1, 'rgba(2, 4, 3, 0)')
   context.fillStyle = gradient

@@ -1,5 +1,6 @@
 import { ArrowUpRight } from 'lucide-react'
-import { motion } from 'motion/react'
+import { useEffect, useRef } from 'react'
+import { animate, motion, useInView } from 'motion/react'
 import { useReducedMotion } from '../hooks/useMediaQuery'
 
 const ease = [0.22, 1, 0.36, 1]
@@ -23,6 +24,53 @@ export function Reveal({
     >
       {children}
     </motion.div>
+  )
+}
+
+// Counts from zero to `value` the first time it scrolls into view. The final
+// value reserves the width, so the unit beside it never shifts, and screen
+// readers get the final figure straight away.
+export function CountUp({ value, delay = 0, duration = 2.4, className = '' }) {
+  const ref = useRef(null)
+  const liveRef = useRef(null)
+  const inView = useInView(ref, { once: true, amount: 0.6 })
+  const reduced = useReducedMotion()
+  const target = Number.parseFloat(value)
+  const decimals = (String(value).split('.')[1] || '').length
+
+  useEffect(() => {
+    const live = liveRef.current
+    if (!live || Number.isNaN(target)) return undefined
+    if (reduced) {
+      live.textContent = value
+      return undefined
+    }
+    if (!inView) {
+      live.textContent = (0).toFixed(decimals)
+      return undefined
+    }
+    const controls = animate(0, target, {
+      duration,
+      delay,
+      ease: [0.33, 1, 0.68, 1],
+      onUpdate: (latest) => {
+        live.textContent = latest.toFixed(decimals)
+      },
+      onComplete: () => {
+        live.textContent = value
+      },
+    })
+    return () => controls.stop()
+  }, [inView, reduced, target, decimals, value, delay, duration])
+
+  return (
+    <span ref={ref} className={`count-up${inView || reduced ? ' is-counted' : ''} ${className}`.trim()}>
+      <span className="count-up__ghost" aria-hidden="true">{value}</span>
+      <span ref={liveRef} className="count-up__live" aria-hidden="true">
+        {reduced ? value : (0).toFixed(decimals)}
+      </span>
+      <span className="sr-only">{value}</span>
+    </span>
   )
 }
 

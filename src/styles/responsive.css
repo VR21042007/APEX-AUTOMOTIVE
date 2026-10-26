@@ -44,7 +44,7 @@
   }
 
   .hero-title {
-    font-size: clamp(82px, 12.4vw, 142px);
+    font-size: clamp(62px, 9.4vw, 110px);
   }
 
   .hero-side-note {
@@ -552,14 +552,22 @@
     align-items: flex-end;
   }
 
-  .story-panel::before {
+  .story-panel::before,
+  .cinematic-frame .story-panel::before,
+  .cinematic-frame .story-panel--right::before,
+  .cinematic-frame .story-panel--center::before {
     position: absolute;
     top: auto;
     right: 0;
     bottom: 0;
     left: 0;
     height: 62%;
-    background: linear-gradient(to top, rgba(5, 5, 4, 0.97), rgba(5, 5, 4, 0.68) 48%, transparent);
+    background: linear-gradient(
+      to top,
+      color-mix(in srgb, var(--shade) 97%, transparent),
+      color-mix(in srgb, var(--shade) 68%, transparent) 48%,
+      transparent
+    );
     content: '';
     pointer-events: none;
   }
@@ -1054,7 +1062,7 @@
 @media (min-width: 781px) and (max-height: 760px) {
   .hero-title {
     top: 118px;
-    font-size: clamp(78px, 10.4vw, 136px);
+    font-size: clamp(60px, 7.6vw, 110px);
   }
 
   .hero-stage__bottom {

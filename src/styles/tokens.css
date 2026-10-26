@@ -5,10 +5,10 @@
   --bone: #e8e8d9;
   --bone-bright: #f4efe7;
   --ivory: #f3efe7;
-  --accent: #00b87a;
-  --accent-deep: #007a4d;
-  --brand-green: #004225;
-  --brand-emerald: #00c98a;
+  /* McLaren Papaya, matched to the car's paint. --accent-deep is for text on light backgrounds. */
+  --accent: #ff7a00;
+  --accent-rgb: 255, 122, 0;
+  --accent-deep: #a84400;
   --champagne: #f2e8cf;
   --cool-white: #e9f1f6;
   --graphite: #0a0d0b;
